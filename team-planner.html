@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Planner</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f5f3;
+    --bg-tertiary: #eeedeb;
+    --text-primary: #1a1a18;
+    --text-secondary: #5f5e5a;
+    --text-tertiary: #88877f;
+    --border: rgba(0,0,0,0.12);
+    --border-md: rgba(0,0,0,0.2);
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --info-bg: #e6f1fb;
+    --info-text: #0c447c;
+    --success-bg: #eaf3de;
+    --success-text: #27500a;
+    --warning-bg: #faeeda;
+    --warning-text: #633806;
+    --sidebar-w: 220px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-primary: #1c1c1a;
+      --bg-secondary: #252523;
+      --bg-tertiary: #2e2e2c;
+      --text-primary: #e8e6de;
+      --text-secondary: #9c9a92;
+      --text-tertiary: #6b6a64;
+      --border: rgba(255,255,255,0.1);
+      --border-md: rgba(255,255,255,0.18);
+      --info-bg: #042c53;
+      --info-text: #85b7eb;
+      --success-bg: #173404;
+      --success-text: #97c459;
+      --warning-bg: #412402;
+      --warning-text: #ef9f27;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  #app { display: flex; height: 100vh; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: var(--sidebar-w);
+    border-right: 0.5px solid var(--border);
+    display: flex; flex-direction: column; flex-shrink: 0;
+    background: var(--bg-secondary);
+    overflow: hidden;
+  }
+  .sidebar-header { padding: 16px 14px 12px; border-bottom: 0.5px solid var(--border); }
+  .sidebar-header h1 { font-size: 14px; font-weight: 600; }
+  .sidebar-header p { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+  .nav-section { padding: 10px 8px 0; flex: 1; overflow-y: auto; }
+  .nav-label { font-size: 10px; font-weight: 600; color: var(--text-tertiary); letter-spacing: .06em; text-transform: uppercase; padding: 0 6px 6px; }
+  .nav-btn {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 7px 8px; border-radius: var(--radius-md);
+    border: none; background: none; cursor: pointer;
+    font-size: 13px; color: var(--text-secondary); text-align: left;
+    transition: background .15s;
+  }
+  .nav-btn:hover { background: var(--bg-primary); color: var(--text-primary); }
+  .nav-btn.active { background: var(--bg-primary); color: var(--text-primary); font-weight: 500; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .team-section { padding: 10px 8px 14px; border-top: 0.5px solid var(--border); }
+
+  /* ── Main ── */
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-primary); }
+  #topbar {
+    padding: 12px 20px; border-bottom: 0.5px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  #topbar h2 { font-size: 15px; font-weight: 500; }
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+  .btn {
+    padding: 6px 12px; border-radius: var(--radius-md);
+    border: 0.5px solid var(--border-md); background: none; cursor: pointer;
+    font-size: 12px; color: var(--text-secondary); transition: background .15s;
+    font-family: inherit;
+  }
+  .btn:hover { background: var(--bg-secondary); }
+  .btn-primary {
+    background: var(--text-primary); color: var(--bg-primary);
+    border-color: var(--text-primary);
+  }
+  .btn-primary:hover { opacity: .85; background: var(--text-primary); }
+  #content { flex: 1; overflow-y: auto; padding: 20px; }
+
+  /* ── Goals view ── */
+  .goal-card {
+    background: var(--bg-primary); border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg); margin-bottom: 12px; overflow: hidden;
+  }
+  .goal-header { padding: 14px 16px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .goal-title { font-weight: 500; font-size: 14px; flex: 1; }
+  .goal-meta { font-size: 11px; color: var(--text-tertiary); margin-top: 1px; }
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin: 0 16px 14px; }
+  .progress-fill { height: 100%; border-radius: 2px; transition: width .4s; }
+  .goal-body { border-top: 0.5px solid var(--border); }
+  .activity-row { padding: 10px 16px 10px 28px; border-bottom: 0.5px solid var(--border); }
+  .activity-row:last-child { border-bottom: none; }
+  .activity-row:hover { background: var(--bg-secondary); }
+  .activity-header { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .activity-name { font-size: 13px; flex: 1; }
+  .badge { font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 500; }
+  .badge-blue { background: var(--info-bg); color: var(--info-text); }
+  .badge-green { background: var(--success-bg); color: var(--success-text); }
+  .badge-amber { background: var(--warning-bg); color: var(--warning-text); }
+  .task-list { padding: 6px 0 2px 20px; }
+  .task-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+  .task-row:hover { background: var(--bg-secondary); }
+  .task-check {
+    width: 14px; height: 14px; border: 0.5px solid var(--border-md);
+    border-radius: 3px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: background .15s, border .15s;
+  }
+  .task-check.done { background: #3b6d11; border-color: #3b6d11; }
+  .task-check.done::after {
+    content: ''; display: block; width: 8px; height: 5px;
+    border-left: 1.5px solid white; border-bottom: 1.5px solid white;
+    transform: rotate(-45deg) translateY(-1px);
+  }
+  .task-label { font-size: 12px; flex: 1; }
+  .task-label.done { text-decoration: line-through; color: var(--text-tertiary); }
+  .task-week { font-size: 10px; color: var(--text-tertiary); background: var(--bg-secondary); padding: 1px 5px; border-radius: 4px; }
+  .collapsed { display: none; }
+  .chev { font-size: 10px; color: var(--text-tertiary); transition: transform .2s; display: inline-block; }
+  .chev.open { transform: rotate(90deg); }
+
+  /* ── Week view ── */
+  .week-grid { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 10px; }
+  .day-col {
+    background: var(--bg-primary); border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg); min-height: 320px; overflow: hidden;
+  }
+  .day-header { padding: 10px 12px; border-bottom: 0.5px solid var(--border); }
+  .day-name { font-size: 11px; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .05em; }
+  .day-date { font-size: 18px; font-weight: 500; line-height: 1.2; }
+  .day-date.today { color: var(--info-text); }
+  .day-tasks { padding: 8px; }
+  .day-task {
+    padding: 7px 9px; border-radius: 6px; margin-bottom: 6px; cursor: pointer;
+    border: 0.5px solid transparent; transition: border .15s;
+  }
+  .day-task:hover { border-color: var(--border-md) !important; }
+  .day-task-title { font-size: 12px; font-weight: 500; line-height: 1.3; }
+  .day-task-sub { font-size: 10px; margin-top: 2px; opacity: .7; }
+  .drop-hint {
+    border: 0.5px dashed var(--border-md); border-radius: 6px;
+    padding: 7px 9px; font-size: 11px; color: var(--text-tertiary);
+    text-align: center; margin-bottom: 6px; display: none;
+  }
+  .day-col.drag-over .drop-hint { display: block; }
+  .add-task-day {
+    width: 100%; padding: 5px 8px; background: none; border: none;
+    font-size: 11px; color: var(--text-tertiary); text-align: left;
+    cursor: pointer; border-radius: 4px; font-family: inherit;
+  }
+  .add-task-day:hover { color: var(--text-secondary); background: var(--bg-secondary); }
+
+  /* ── Team view ── */
+  .team-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+  .member-card { background: var(--bg-primary); border: 0.5px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+  .member-header { padding: 12px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 0.5px solid var(--border); }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; flex-shrink: 0; }
+  .member-name { font-weight: 500; font-size: 13px; }
+  .member-role { font-size: 11px; color: var(--text-tertiary); }
+  .member-stats { display: flex; gap: 12px; padding: 10px 16px; border-bottom: 0.5px solid var(--border); }
+  .stat { text-align: center; }
+  .stat-val { font-size: 18px; font-weight: 500; line-height: 1.1; }
+  .stat-label { font-size: 10px; color: var(--text-tertiary); margin-top: 1px; }
+  .member-tasks { padding: 8px 12px 12px; }
+
+  /* ── Modal ── */
+  #modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    display: none; align-items: center; justify-content: center; z-index: 100;
+  }
+  #modal-overlay.open { display: flex; }
+  #modal {
+    background: var(--bg-primary); border-radius: var(--radius-lg);
+    border: 0.5px solid var(--border-md); width: 480px;
+    max-width: calc(100vw - 32px); max-height: 80vh; overflow-y: auto;
+  }
+  .modal-header { padding: 16px 20px; border-bottom: 0.5px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .modal-header h3 { font-size: 14px; font-weight: 500; }
+  .modal-close { background: none; border: none; cursor: pointer; font-size: 20px; color: var(--text-tertiary); line-height: 1; }
+  .modal-body { padding: 20px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 5px; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 7px 10px;
+    border: 0.5px solid var(--border-md); border-radius: var(--radius-md);
+    background: var(--bg-secondary); color: var(--text-primary);
+    font-size: 13px; font-family: inherit;
+  }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .modal-footer { padding: 12px 20px; border-top: 0.5px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+  select { cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <h1>Team Planner</h1>
+      <p>Howwe companion</p>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Views</div>
+      <button class="nav-btn active" onclick="showView('goals')" id="nav-goals">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.2"/><circle cx="7" cy="7" r="2" fill="currentColor"/></svg>
+        Goals &amp; activities
+      </button>
+      <button class="nav-btn" onclick="showView('week')" id="nav-week">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M1 5h12" stroke="currentColor" stroke-width="1.2"/><path d="M4 1v2M10 1v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Week plan
+      </button>
+      <button class="nav-btn" onclick="showView('team')" id="nav-team">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.2"/><circle cx="10" cy="5" r="2" stroke="currentColor" stroke-width="1.2"/><path d="M1 12c0-2 1.8-3.5 4-3.5s4 1.5 4 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M11 8.5c1.2.4 2 1.5 2 2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Team board
+      </button>
+      <div class="nav-label" style="margin-top:16px;">Weeks</div>
+      <div id="sidebar-weeks"></div>
+    </div>
+    <div class="team-section">
+      <div class="nav-label">Team</div>
+      <div id="sidebar-members"></div>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="topbar">
+      <h2 id="view-title">Goals &amp; Activities</h2>
+      <div class="topbar-right">
+        <select id="member-filter" class="btn" onchange="renderAll()">
+          <option value="all">All members</option>
+        </select>
+        <button class="btn btn-primary" id="add-btn" onclick="openModal('goal')">+ Add goal</button>
+      </div>
+    </div>
+    <div id="content"></div>
+  </div>
+</div>
+
+<div id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div id="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Add goal</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Colour palette ───────────────────────────────────────────────────────────
+const COLORS = [
+  { bg: '#E6F1FB', text: '#0C447C', dot: '#378ADD' },
+  { bg: '#E1F5EE', text: '#085041', dot: '#1D9E75' },
+  { bg: '#FAEEDA', text: '#633806', dot: '#EF9F27' },
+  { bg: '#FBEAF0', text: '#72243E', dot: '#D4537E' },
+];
+const DAYS  = ['Mon','Tue','Wed','Thu','Fri'];
+const WEEKS = ['W12 (Mar 18–22)','W13 (Mar 25–29)','W14 (Apr 1–5)'];
+const TODAY_DAY  = 2; // Wednesday (0-indexed)
+const TODAY_WEEK = 0;
+
+// ─── Persisted state ──────────────────────────────────────────────────────────
+function loadState() {
+  try {
+    const raw = localStorage.getItem('team-planner-state');
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return null;
+}
+function saveState() {
+  try { localStorage.setItem('team-planner-state', JSON.stringify(state)); } catch(e) {}
+}
+
+const DEFAULT_STATE = {
+  members: [
+    { id: 1, name: 'Anna K.',    initials: 'AK', role: 'Team lead',   colorIdx: 0 },
+    { id: 2, name: 'Björn L.',   initials: 'BL', role: 'Analyst',     colorIdx: 1 },
+    { id: 3, name: 'Cecilia M.', initials: 'CM', role: 'Specialist',  colorIdx: 2 },
+    { id: 4, name: 'David N.',   initials: 'DN', role: 'Coordinator', colorIdx: 3 },
+  ],
+  goals: [
+    {
+      id: 1, title: 'Q2 Customer retention programme', colorIdx: 0,
+      activities: [
+        { id: 11, title: 'Onboarding email sequence', status: 'in-progress', tasks: [
+          { id: 111, title: 'Map current customer journey',   done: true,  assigneeId: 1, week: 0, day: 0 },
+          { id: 112, title: 'Write 5-email sequence draft',   done: false, assigneeId: 1, week: 0, day: 2 },
+          { id: 113, title: 'Review with team',               done: false, assigneeId: 2, week: 0, day: 3 },
+        ]},
+        { id: 12, title: 'NPS survey & analysis', status: 'not-started', tasks: [
+          { id: 121, title: 'Design survey questions', done: false, assigneeId: 3, week: 1, day: 0 },
+          { id: 122, title: 'Set up Typeform',         done: false, assigneeId: 2, week: 1, day: 1 },
+        ]}
+      ]
+    },
+    {
+      id: 2, title: 'Internal process documentation', colorIdx: 1,
+      activities: [
+        { id: 21, title: 'Document team workflows', status: 'in-progress', tasks: [
+          { id: 211, title: 'Interview each team member', done: true,  assigneeId: 4, week: 0, day: 1 },
+          { id: 212, title: 'Draft process maps',         done: false, assigneeId: 4, week: 0, day: 4 },
+          { id: 213, title: 'Upload to shared drive',     done: false, assigneeId: 3, week: 1, day: 0 },
+        ]}
+      ]
+    },
+    {
+      id: 3, title: 'Team capability building', colorIdx: 2,
+      activities: [
+        { id: 31, title: 'Skills gap analysis', status: 'done', tasks: [
+          { id: 311, title: 'Collect self-assessments', done: true, assigneeId: 1, week: 0, day: 0 },
+          { id: 312, title: 'Compile gap report',       done: true, assigneeId: 1, week: 0, day: 1 },
+        ]},
+        { id: 32, title: 'Learning plan per person', status: 'not-started', tasks: [
+          { id: 321, title: 'Book learning sessions', done: false, assigneeId: 2, week: 1, day: 2 },
+        ]}
+      ]
+    }
+  ]
+};
+
+let state = loadState() || JSON.parse(JSON.stringify(DEFAULT_STATE));
+
+// ─── UI state (not persisted) ─────────────────────────────────────────────────
+let currentView = 'goals';
+let currentWeek = TODAY_WEEK;
+let modalMode   = null;
+let modalCtx    = null;
+let openGoals   = {};
+let openActs    = {};
+let draggedId   = null;
+
+// Pre-open everything on first load
+state.goals.forEach(g => {
+  openGoals[g.id] = true;
+  g.activities.forEach(a => { openActs[a.id] = true; });
+});
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const memberById = id => state.members.find(m => m.id === id);
+const goalById   = id => state.goals.find(g => g.id === id);
+function allTasks() {
+  const out = [];
+  state.goals.forEach(g => g.activities.forEach(a => a.tasks.forEach(t =>
+    out.push({ ...t, activityId: a.id, goalId: g.id })
+  )));
+  return out;
+}
+function goalProgress(goal) {
+  const tasks = goal.activities.flatMap(a => a.tasks);
+  return tasks.length ? Math.round(tasks.filter(t => t.done).length / tasks.length * 100) : 0;
+}
+function mc(idx) { return COLORS[idx % COLORS.length]; }
+function statusBadge(s) {
+  if (s === 'done')        return '<span class="badge badge-green">Done</span>';
+  if (s === 'in-progress') return '<span class="badge badge-blue">In progress</span>';
+  return '<span class="badge badge-amber">Not started</span>';
+}
+function filterMid() {
+  const v = document.getElementById('member-filter').value;
+  return v === 'all' ? null : parseInt(v);
+}
+function nextId() { return Date.now() + Math.floor(Math.random()*1000); }
+
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+function renderSidebar() {
+  document.getElementById('sidebar-weeks').innerHTML = WEEKS.map((w,i) =>
+    `<button class="nav-btn ${currentWeek===i?'active':''}" style="font-size:11px;" onclick="setWeek(${i})">${w}</button>`
+  ).join('');
+
+  document.getElementById('sidebar-members').innerHTML = state.members.map(m => {
+    const c = mc(m.colorIdx);
+    return `<button class="nav-btn" style="font-size:12px;" onclick="filterMember(${m.id})">
+      <span class="dot" style="background:${c.dot}"></span>${m.name}
+    </button>`;
+  }).join('');
+
+  const sel = document.getElementById('member-filter');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="all">All members</option>' +
+    state.members.map(m => `<option value="${m.id}" ${cur==m.id?'selected':''}>${m.name}</option>`).join('');
+}
+
+function setWeek(i) { currentWeek = i; showView('week'); }
+function filterMember(id) { document.getElementById('member-filter').value = id; showView('goals'); }
+
+// ─── View switching ───────────────────────────────────────────────────────────
+function showView(v) {
+  currentView = v;
+  ['goals','week','team'].forEach(n =>
+    document.getElementById('nav-'+n).classList.toggle('active', n===v)
+  );
+  const titles = { goals:'Goals &amp; Activities', week: WEEKS[currentWeek], team:'Team board' };
+  document.getElementById('view-title').innerHTML = titles[v];
+  const btn = document.getElementById('add-btn');
+  if (v === 'goals') { btn.style.display=''; btn.textContent='+ Add goal';  btn.onclick=()=>openModal('goal'); }
+  else if (v === 'week') { btn.style.display=''; btn.textContent='+ Add task'; btn.onclick=()=>openModal('task',{week:currentWeek,day:0}); }
+  else { btn.style.display='none'; }
+  renderAll();
+}
+
+function renderAll() {
+  renderSidebar();
+  if (currentView==='goals')  renderGoals();
+  else if (currentView==='week') renderWeek();
+  else renderTeam();
+}
+
+// ─── Goals view ───────────────────────────────────────────────────────────────
+function renderGoals() {
+  const fid = filterMid();
+  let html = '';
+  state.goals.forEach(g => {
+    const prog = goalProgress(g);
+    const c = mc(g.colorIdx);
+    html += `<div class="goal-card">
+      <div class="goal-header" onclick="toggleGoal(${g.id})">
+        <div style="width:4px;height:36px;border-radius:2px;background:${c.dot};flex-shrink:0;"></div>
+        <div style="flex:1;min-width:0;">
+          <div class="goal-title">${esc(g.title)}</div>
+          <div class="goal-meta">${g.activities.length} activities · ${prog}% complete</div>
+        </div>
+        <button class="btn" style="font-size:11px;margin-right:4px;" onclick="event.stopPropagation();openModal('activity',{goalId:${g.id}})">+ Activity</button>
+        <span class="chev ${openGoals[g.id]?'open':''}">▶</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${prog}%;background:${c.dot};"></div></div>
+      <div class="goal-body ${openGoals[g.id]?'':'collapsed'}">`;
+
+    g.activities.forEach(a => {
+      const visible = fid ? a.tasks.filter(t => t.assigneeId===fid) : a.tasks;
+      if (fid && !visible.length) return;
+      html += `<div class="activity-row">
+        <div class="activity-header" onclick="toggleAct(${a.id})">
+          <span class="chev ${openActs[a.id]?'open':''}" style="font-size:9px;">▶</span>
+          <span class="activity-name">${esc(a.title)}</span>
+          ${statusBadge(a.status)}
+          <button class="btn" style="font-size:10px;padding:3px 8px;" onclick="event.stopPropagation();openModal('task',{goalId:${g.id},activityId:${a.id},week:${currentWeek}})">+ Task</button>
+        </div>
+        <div class="task-list ${openActs[a.id]?'':'collapsed'}">`;
+      visible.forEach(t => {
+        const m  = memberById(t.assigneeId);
+        const tc = m ? mc(m.colorIdx) : COLORS[0];
+        html += `<div class="task-row" draggable="true" ondragstart="onDragStart(event,${t.id})">
+          <div class="task-check ${t.done?'done':''}" onclick="toggleTask(${t.id})"></div>
+          <span class="task-label ${t.done?'done':''}">${esc(t.title)}</span>
+          ${m ? `<span style="font-size:10px;background:${tc.bg};color:${tc.text};padding:1px 6px;border-radius:10px;">${m.initials}</span>` : ''}
+          <span class="task-week">${WEEKS[t.week].split(' ')[0]} ${DAYS[t.day]}</span>
+        </div>`;
+      });
+      html += `</div></div>`;
+    });
+    html += `</div></div>`;
+  });
+  document.getElementById('content').innerHTML = html;
+}
+
+function toggleGoal(id) { openGoals[id]=!openGoals[id]; renderAll(); }
+function toggleAct(id)  { openActs[id]=!openActs[id];   renderAll(); }
+function toggleTask(id) {
+  state.goals.forEach(g => g.activities.forEach(a => {
+    const t = a.tasks.find(t => t.id===id);
+    if (t) t.done = !t.done;
+  }));
+  saveState(); renderAll();
+}
+
+// ─── Week view ────────────────────────────────────────────────────────────────
+function renderWeek() {
+  const fid = filterMid();
+  const tasks = allTasks().filter(t => t.week===currentWeek && (!fid || t.assigneeId===fid));
+  let html = `<div class="week-grid">`;
+  DAYS.forEach((day, di) => {
+    const dayTasks = tasks.filter(t => t.day===di);
+    const isToday  = currentWeek===TODAY_WEEK && di===TODAY_DAY;
+    html += `<div class="day-col" id="day-${di}"
+      ondragover="event.preventDefault();this.classList.add('drag-over')"
+      ondragleave="this.classList.remove('drag-over')"
+      ondrop="onDrop(event,${di})">
+      <div class="day-header">
+        <div class="day-name">${day}</div>
+        <div class="day-date ${isToday?'today':''}">${18+di}</div>
+      </div>
+      <div class="day-tasks">
+        <div class="drop-hint">Drop task here</div>`;
+    dayTasks.forEach(t => {
+      const g  = goalById(t.goalId);
+      const gc = g ? mc(g.colorIdx) : COLORS[0];
+      const m  = memberById(t.assigneeId);
+      html += `<div class="day-task" style="background:${gc.bg};" draggable="true" ondragstart="onDragStart(event,${t.id})">
+        <div class="day-task-title" style="color:${gc.text};">${esc(t.title)}</div>
+        <div class="day-task-sub"   style="color:${gc.text};">${g ? esc(g.title).substring(0,28)+'…' : ''}${m?' · '+m.initials:''}</div>
+      </div>`;
+    });
+    html += `<button class="add-task-day" onclick="openModal('task',{week:${currentWeek},day:${di}})">+ Add task</button>
+      </div></div>`;
+  });
+  html += `</div>`;
+  document.getElementById('content').innerHTML = html;
+}
+
+function onDragStart(e, id) { draggedId = id; e.dataTransfer.effectAllowed='move'; }
+function onDrop(e, dayIdx) {
+  e.preventDefault();
+  document.querySelectorAll('.day-col').forEach(d => d.classList.remove('drag-over'));
+  if (draggedId === null) return;
+  state.goals.forEach(g => g.activities.forEach(a => {
+    const t = a.tasks.find(t => t.id===draggedId);
+    if (t) { t.day=dayIdx; t.week=currentWeek; }
+  }));
+  draggedId = null;
+  saveState(); renderAll();
+}
+
+// ─── Team view ────────────────────────────────────────────────────────────────
+function renderTeam() {
+  const tasks = allTasks();
+  let html = `<div class="team-grid">`;
+  state.members.forEach(m => {
+    const mt = tasks.filter(t => t.assigneeId===m.id);
+    const done = mt.filter(t => t.done).length;
+    const wt   = mt.filter(t => t.week===currentWeek);
+    const c    = mc(m.colorIdx);
+    html += `<div class="member-card">
+      <div class="member-header">
+        <div class="avatar" style="background:${c.bg};color:${c.text};">${m.initials}</div>
+        <div><div class="member-name">${m.name}</div><div class="member-role">${m.role}</div></div>
+      </div>
+      <div class="member-stats">
+        <div class="stat"><div class="stat-val">${mt.length}</div><div class="stat-label">Total tasks</div></div>
+        <div class="stat"><div class="stat-val" style="color:#3b6d11;">${done}</div><div class="stat-label">Done</div></div>
+        <div class="stat"><div class="stat-val" style="color:#185fa5;">${wt.length}</div><div class="stat-label">This week</div></div>
+        <div class="stat"><div class="stat-val">${mt.length?Math.round(done/mt.length*100):0}%</div><div class="stat-label">Progress</div></div>
+      </div>
+      <div class="member-tasks">`;
+    const pending = mt.filter(t => !t.done).slice(0,4);
+    if (!pending.length) {
+      html += `<p style="font-size:11px;color:var(--text-tertiary);padding:4px 0;">All tasks complete ✓</p>`;
+    }
+    pending.forEach(t => {
+      const g = goalById(t.goalId);
+      const gc = g ? mc(g.colorIdx) : COLORS[0];
+      html += `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:0.5px solid var(--border);">
+        <div style="width:3px;height:28px;border-radius:2px;background:${gc.dot};flex-shrink:0;"></div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.title)}</div>
+          <div style="font-size:10px;color:var(--text-tertiary);">${WEEKS[t.week].split(' ')[0]} ${DAYS[t.day]}</div>
+        </div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  });
+  html += `</div>`;
+  document.getElementById('content').innerHTML = html;
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+function openModal(mode, ctx={}) {
+  modalMode = mode; modalCtx = ctx;
+  document.getElementById('modal-title').textContent =
+    { goal:'Add goal', activity:'Add activity', task:'Add task' }[mode];
+  let body = '';
+  if (mode === 'goal') {
+    body = `<div class="field"><label>Goal title</label><input id="f-title" placeholder="e.g. Improve customer satisfaction"></div>
+    <div class="field"><label>Colour</label><select id="f-color">${COLORS.map((_,i)=>`<option value="${i}">Colour ${i+1}</option>`).join('')}</select></div>`;
+  } else if (mode === 'activity') {
+    const g = goalById(ctx.goalId);
+    body = `<div class="field"><label>Goal</label><input value="${g?esc(g.title):''}" disabled style="opacity:.6;"></div>
+    <div class="field"><label>Activity title</label><input id="f-title" placeholder="e.g. Customer interviews"></div>
+    <div class="field"><label>Status</label><select id="f-status">
+      <option value="not-started">Not started</option>
+      <option value="in-progress">In progress</option>
+      <option value="done">Done</option>
+    </select></div>`;
+  } else {
+    const goalOpts = state.goals.map(g => `<option value="${g.id}">${esc(g.title)}</option>`).join('');
+    const firstGoal = ctx.goalId ? goalById(ctx.goalId) : state.goals[0];
+    const actOpts = firstGoal ? firstGoal.activities.map(a => `<option value="${a.id}">${esc(a.title)}</option>`).join('') : '';
+    body = `<div class="field"><label>Task title</label><input id="f-title" placeholder="e.g. Write first draft"></div>
+    <div class="field"><label>Goal</label><select id="f-goal" onchange="updateActList()">${goalOpts}</select></div>
+    <div class="field"><label>Activity</label><select id="f-activity">${actOpts}</select></div>
+    <div class="field"><label>Assigned to</label><select id="f-member">${state.members.map(m=>`<option value="${m.id}">${m.name}</option>`).join('')}</select></div>
+    <div class="field" style="display:flex;gap:10px;">
+      <div style="flex:1;"><label>Week</label><select id="f-week">${WEEKS.map((w,i)=>`<option value="${i}" ${ctx.week===i?'selected':''}>${w}</option>`).join('')}</select></div>
+      <div style="flex:1;"><label>Day</label><select id="f-day">${DAYS.map((d,i)=>`<option value="${i}" ${ctx.day===i?'selected':''}>${d}</option>`).join('')}</select></div>
+    </div>`;
+  }
+  document.getElementById('modal-body').innerHTML = body;
+  if (mode==='task') {
+    if (ctx.goalId) document.getElementById('f-goal').value = ctx.goalId;
+    if (ctx.activityId) document.getElementById('f-activity').value = ctx.activityId;
+  }
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('f-title')?.focus(), 50);
+}
+
+function updateActList() {
+  const gid = parseInt(document.getElementById('f-goal').value);
+  const g = goalById(gid);
+  document.getElementById('f-activity').innerHTML = g
+    ? g.activities.map(a => `<option value="${a.id}">${esc(a.title)}</option>`).join('')
+    : '';
+}
+
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+
+function saveModal() {
+  const title = document.getElementById('f-title')?.value?.trim();
+  if (!title) return;
+  if (modalMode === 'goal') {
+    const colorIdx = parseInt(document.getElementById('f-color').value);
+    state.goals.push({ id: nextId(), title, colorIdx, activities: [] });
+  } else if (modalMode === 'activity') {
+    const g = goalById(modalCtx.goalId);
+    if (g) {
+      const status = document.getElementById('f-status').value;
+      g.activities.push({ id: nextId(), title, status, tasks: [] });
+      openGoals[g.id] = true;
+    }
+  } else {
+    const gid = parseInt(document.getElementById('f-goal').value);
+    const aid = parseInt(document.getElementById('f-activity').value);
+    const g = goalById(gid);
+    const a = g?.activities.find(a => a.id===aid);
+    if (a) {
+      a.tasks.push({
+        id: nextId(), title, done: false,
+        assigneeId: parseInt(document.getElementById('f-member').value),
+        week: parseInt(document.getElementById('f-week').value),
+        day:  parseInt(document.getElementById('f-day').value),
+      });
+      openGoals[gid] = true; openActs[aid] = true;
+    }
+  }
+  closeModal(); saveState(); renderAll();
+}
+
+// Keyboard shortcut: Enter to save modal
+document.getElementById('modal').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') { e.preventDefault(); saveModal(); }
+  if (e.key === 'Escape') closeModal();
+});
+
+// ─── Utility ──────────────────────────────────────────────────────────────────
+function esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+renderAll();
+</script>
+</body>
+</html>
