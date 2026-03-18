@@ -4,177 +4,154 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Team Planner</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
-    --bg-primary: #ffffff;
-    --bg-secondary: #f5f5f3;
-    --bg-tertiary: #eeedeb;
-    --text-primary: #1a1a18;
-    --text-secondary: #5f5e5a;
-    --text-tertiary: #88877f;
-    --border: rgba(0,0,0,0.12);
-    --border-md: rgba(0,0,0,0.2);
-    --radius-md: 8px;
-    --radius-lg: 12px;
-    --info-bg: #e6f1fb;
-    --info-text: #0c447c;
-    --success-bg: #eaf3de;
-    --success-text: #27500a;
-    --warning-bg: #faeeda;
-    --warning-text: #633806;
+    --bg-primary: #ffffff; --bg-secondary: #f5f5f3; --bg-tertiary: #eeedeb;
+    --text-primary: #1a1a18; --text-secondary: #5f5e5a; --text-tertiary: #88877f;
+    --border: rgba(0,0,0,0.12); --border-md: rgba(0,0,0,0.2);
+    --radius-md: 8px; --radius-lg: 12px;
+    --info-bg: #e6f1fb; --info-text: #0c447c;
+    --success-bg: #eaf3de; --success-text: #27500a;
+    --warning-bg: #faeeda; --warning-text: #633806;
+    --danger-bg: #fcebeb; --danger-text: #a32d2d;
     --sidebar-w: 220px;
   }
-
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg-primary: #1c1c1a;
-      --bg-secondary: #252523;
-      --bg-tertiary: #2e2e2c;
-      --text-primary: #e8e6de;
-      --text-secondary: #9c9a92;
-      --text-tertiary: #6b6a64;
-      --border: rgba(255,255,255,0.1);
-      --border-md: rgba(255,255,255,0.18);
-      --info-bg: #042c53;
-      --info-text: #85b7eb;
-      --success-bg: #173404;
-      --success-text: #97c459;
-      --warning-bg: #412402;
-      --warning-text: #ef9f27;
+      --bg-primary: #1c1c1a; --bg-secondary: #252523; --bg-tertiary: #2e2e2c;
+      --text-primary: #e8e6de; --text-secondary: #9c9a92; --text-tertiary: #6b6a64;
+      --border: rgba(255,255,255,0.1); --border-md: rgba(255,255,255,0.18);
+      --info-bg: #042c53; --info-text: #85b7eb;
+      --success-bg: #173404; --success-text: #97c459;
+      --warning-bg: #412402; --warning-text: #ef9f27;
+      --danger-bg: #501313; --danger-text: #f09595;
     }
   }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 14px; color: var(--text-primary); background: var(--bg-tertiary); height: 100vh; overflow: hidden; }
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-    font-size: 14px;
-    color: var(--text-primary);
-    background: var(--bg-tertiary);
-    height: 100vh;
-    overflow: hidden;
+  /* ── Lock screen ── */
+  #lock-screen {
+    position: fixed; inset: 0; background: var(--bg-tertiary);
+    display: flex; align-items: center; justify-content: center; z-index: 999;
   }
+  #lock-screen.hidden { display: none; }
+  .lock-card {
+    background: var(--bg-primary); border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-lg); padding: 36px 40px; width: 340px; text-align: center;
+  }
+  .lock-card h2 { font-size: 16px; font-weight: 500; margin-bottom: 6px; }
+  .lock-card p  { font-size: 13px; color: var(--text-tertiary); margin-bottom: 24px; }
+  .lock-card input {
+    width: 100%; padding: 9px 12px; border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md); background: var(--bg-secondary);
+    color: var(--text-primary); font-size: 14px; font-family: inherit;
+    margin-bottom: 10px; text-align: center; letter-spacing: .05em;
+  }
+  .lock-card input:focus { outline: none; border-color: var(--info-text); }
+  .lock-error { font-size: 12px; color: var(--danger-text); margin-bottom: 10px; min-height: 18px; }
 
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--text-primary); color: var(--bg-primary);
+    padding: 8px 18px; border-radius: 20px; font-size: 12px;
+    opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 500; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; }
+
+  /* ── Sync indicator ── */
+  #sync-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #3b6d11;
+    display: inline-block; margin-right: 6px; transition: background .3s;
+  }
+  #sync-dot.syncing { background: #ef9f27; animation: pulse .8s ease-in-out infinite; }
+  #sync-dot.error   { background: #a32d2d; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* ── Layout ── */
   #app { display: flex; height: 100vh; overflow: hidden; }
-
-  /* ── Sidebar ── */
-  #sidebar {
-    width: var(--sidebar-w);
-    border-right: 0.5px solid var(--border);
-    display: flex; flex-direction: column; flex-shrink: 0;
-    background: var(--bg-secondary);
-    overflow: hidden;
-  }
+  #sidebar { width: var(--sidebar-w); border-right: 0.5px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; background: var(--bg-secondary); overflow: hidden; }
   .sidebar-header { padding: 16px 14px 12px; border-bottom: 0.5px solid var(--border); }
   .sidebar-header h1 { font-size: 14px; font-weight: 600; }
-  .sidebar-header p { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+  .sidebar-header p  { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; display: flex; align-items: center; }
   .nav-section { padding: 10px 8px 0; flex: 1; overflow-y: auto; }
   .nav-label { font-size: 10px; font-weight: 600; color: var(--text-tertiary); letter-spacing: .06em; text-transform: uppercase; padding: 0 6px 6px; }
-  .nav-btn {
-    display: flex; align-items: center; gap: 8px;
-    width: 100%; padding: 7px 8px; border-radius: var(--radius-md);
-    border: none; background: none; cursor: pointer;
-    font-size: 13px; color: var(--text-secondary); text-align: left;
-    transition: background .15s;
-  }
-  .nav-btn:hover { background: var(--bg-primary); color: var(--text-primary); }
+  .nav-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border-radius: var(--radius-md); border: none; background: none; cursor: pointer; font-size: 13px; color: var(--text-secondary); text-align: left; transition: background .15s; font-family: inherit; }
+  .nav-btn:hover  { background: var(--bg-primary); color: var(--text-primary); }
   .nav-btn.active { background: var(--bg-primary); color: var(--text-primary); font-weight: 500; }
   .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .team-section { padding: 10px 8px 14px; border-top: 0.5px solid var(--border); }
 
   /* ── Main ── */
   #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-primary); }
-  #topbar {
-    padding: 12px 20px; border-bottom: 0.5px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-    flex-shrink: 0;
-  }
+  #topbar { padding: 12px 20px; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
   #topbar h2 { font-size: 15px; font-weight: 500; }
   .topbar-right { display: flex; align-items: center; gap: 8px; }
-  .btn {
-    padding: 6px 12px; border-radius: var(--radius-md);
-    border: 0.5px solid var(--border-md); background: none; cursor: pointer;
-    font-size: 12px; color: var(--text-secondary); transition: background .15s;
-    font-family: inherit;
-  }
+  .btn { padding: 6px 12px; border-radius: var(--radius-md); border: 0.5px solid var(--border-md); background: none; cursor: pointer; font-size: 12px; color: var(--text-secondary); transition: background .15s; font-family: inherit; }
   .btn:hover { background: var(--bg-secondary); }
-  .btn-primary {
-    background: var(--text-primary); color: var(--bg-primary);
-    border-color: var(--text-primary);
-  }
+  .btn-primary { background: var(--text-primary); color: var(--bg-primary); border-color: var(--text-primary); }
   .btn-primary:hover { opacity: .85; background: var(--text-primary); }
+  .btn-danger { color: var(--danger-text); border-color: var(--danger-text); }
+  .btn-danger:hover { background: var(--danger-bg); }
   #content { flex: 1; overflow-y: auto; padding: 20px; }
 
+  /* ── Loading ── */
+  .loading { text-align: center; padding: 60px 20px; color: var(--text-tertiary); font-size: 13px; }
+  .spinner { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--text-secondary); border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   /* ── Goals view ── */
-  .goal-card {
-    background: var(--bg-primary); border: 0.5px solid var(--border);
-    border-radius: var(--radius-lg); margin-bottom: 12px; overflow: hidden;
-  }
+  .goal-card { background: var(--bg-primary); border: 0.5px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 12px; overflow: hidden; }
   .goal-header { padding: 14px 16px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
   .goal-title { font-weight: 500; font-size: 14px; flex: 1; }
-  .goal-meta { font-size: 11px; color: var(--text-tertiary); margin-top: 1px; }
-  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin: 0 16px 14px; }
+  .goal-meta  { font-size: 11px; color: var(--text-tertiary); margin-top: 1px; }
+  .progress-bar  { height: 4px; background: var(--border); border-radius: 2px; margin: 0 16px 14px; }
   .progress-fill { height: 100%; border-radius: 2px; transition: width .4s; }
-  .goal-body { border-top: 0.5px solid var(--border); }
-  .activity-row { padding: 10px 16px 10px 28px; border-bottom: 0.5px solid var(--border); }
+  .goal-body     { border-top: 0.5px solid var(--border); }
+  .activity-row  { padding: 10px 16px 10px 28px; border-bottom: 0.5px solid var(--border); }
   .activity-row:last-child { border-bottom: none; }
   .activity-row:hover { background: var(--bg-secondary); }
   .activity-header { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-  .activity-name { font-size: 13px; flex: 1; }
+  .activity-name   { font-size: 13px; flex: 1; }
   .badge { font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 500; }
-  .badge-blue { background: var(--info-bg); color: var(--info-text); }
+  .badge-blue  { background: var(--info-bg);    color: var(--info-text); }
   .badge-green { background: var(--success-bg); color: var(--success-text); }
   .badge-amber { background: var(--warning-bg); color: var(--warning-text); }
   .task-list { padding: 6px 0 2px 20px; }
-  .task-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+  .task-row  { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; }
   .task-row:hover { background: var(--bg-secondary); }
-  .task-check {
-    width: 14px; height: 14px; border: 0.5px solid var(--border-md);
-    border-radius: 3px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: background .15s, border .15s;
-  }
+  .task-check { width: 14px; height: 14px; border: 0.5px solid var(--border-md); border-radius: 3px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s, border .15s; }
   .task-check.done { background: #3b6d11; border-color: #3b6d11; }
-  .task-check.done::after {
-    content: ''; display: block; width: 8px; height: 5px;
-    border-left: 1.5px solid white; border-bottom: 1.5px solid white;
-    transform: rotate(-45deg) translateY(-1px);
-  }
+  .task-check.done::after { content: ''; display: block; width: 8px; height: 5px; border-left: 1.5px solid white; border-bottom: 1.5px solid white; transform: rotate(-45deg) translateY(-1px); }
   .task-label { font-size: 12px; flex: 1; }
   .task-label.done { text-decoration: line-through; color: var(--text-tertiary); }
-  .task-week { font-size: 10px; color: var(--text-tertiary); background: var(--bg-secondary); padding: 1px 5px; border-radius: 4px; }
+  .task-week { font-size: 10px; color: var(--text-tertiary); background: var(--bg-secondary); padding: 1px 5px; border-radius: 4px; white-space: nowrap; }
+  .delete-btn { background: none; border: none; cursor: pointer; color: var(--text-tertiary); font-size: 14px; padding: 0 2px; opacity: 0; transition: opacity .15s; line-height: 1; }
+  .task-row:hover .delete-btn,
+  .activity-header:hover .delete-btn,
+  .goal-header:hover .delete-btn { opacity: 1; }
+  .delete-btn:hover { color: var(--danger-text); }
   .collapsed { display: none; }
   .chev { font-size: 10px; color: var(--text-tertiary); transition: transform .2s; display: inline-block; }
   .chev.open { transform: rotate(90deg); }
 
   /* ── Week view ── */
   .week-grid { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 10px; }
-  .day-col {
-    background: var(--bg-primary); border: 0.5px solid var(--border);
-    border-radius: var(--radius-lg); min-height: 320px; overflow: hidden;
-  }
+  .day-col { background: var(--bg-primary); border: 0.5px solid var(--border); border-radius: var(--radius-lg); min-height: 320px; overflow: hidden; }
   .day-header { padding: 10px 12px; border-bottom: 0.5px solid var(--border); }
   .day-name { font-size: 11px; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .05em; }
   .day-date { font-size: 18px; font-weight: 500; line-height: 1.2; }
   .day-date.today { color: var(--info-text); }
   .day-tasks { padding: 8px; }
-  .day-task {
-    padding: 7px 9px; border-radius: 6px; margin-bottom: 6px; cursor: pointer;
-    border: 0.5px solid transparent; transition: border .15s;
-  }
+  .day-task  { padding: 7px 9px; border-radius: 6px; margin-bottom: 6px; cursor: grab; border: 0.5px solid transparent; transition: border .15s; }
   .day-task:hover { border-color: var(--border-md) !important; }
   .day-task-title { font-size: 12px; font-weight: 500; line-height: 1.3; }
-  .day-task-sub { font-size: 10px; margin-top: 2px; opacity: .7; }
-  .drop-hint {
-    border: 0.5px dashed var(--border-md); border-radius: 6px;
-    padding: 7px 9px; font-size: 11px; color: var(--text-tertiary);
-    text-align: center; margin-bottom: 6px; display: none;
-  }
+  .day-task-sub   { font-size: 10px; margin-top: 2px; opacity: .7; }
+  .drop-hint { border: 0.5px dashed var(--border-md); border-radius: 6px; padding: 7px 9px; font-size: 11px; color: var(--text-tertiary); text-align: center; margin-bottom: 6px; display: none; }
   .day-col.drag-over .drop-hint { display: block; }
-  .add-task-day {
-    width: 100%; padding: 5px 8px; background: none; border: none;
-    font-size: 11px; color: var(--text-tertiary); text-align: left;
-    cursor: pointer; border-radius: 4px; font-family: inherit;
-  }
+  .add-task-day { width: 100%; padding: 5px 8px; background: none; border: none; font-size: 11px; color: var(--text-tertiary); text-align: left; cursor: pointer; border-radius: 4px; font-family: inherit; }
   .add-task-day:hover { color: var(--text-secondary); background: var(--bg-secondary); }
 
   /* ── Team view ── */
@@ -182,50 +159,48 @@
   .member-card { background: var(--bg-primary); border: 0.5px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
   .member-header { padding: 12px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 0.5px solid var(--border); }
   .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; flex-shrink: 0; }
-  .member-name { font-weight: 500; font-size: 13px; }
-  .member-role { font-size: 11px; color: var(--text-tertiary); }
+  .member-name  { font-weight: 500; font-size: 13px; }
+  .member-role  { font-size: 11px; color: var(--text-tertiary); }
   .member-stats { display: flex; gap: 12px; padding: 10px 16px; border-bottom: 0.5px solid var(--border); }
-  .stat { text-align: center; }
-  .stat-val { font-size: 18px; font-weight: 500; line-height: 1.1; }
+  .stat       { text-align: center; }
+  .stat-val   { font-size: 18px; font-weight: 500; line-height: 1.1; }
   .stat-label { font-size: 10px; color: var(--text-tertiary); margin-top: 1px; }
   .member-tasks { padding: 8px 12px 12px; }
 
   /* ── Modal ── */
-  #modal-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,.45);
-    display: none; align-items: center; justify-content: center; z-index: 100;
-  }
+  #modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 100; }
   #modal-overlay.open { display: flex; }
-  #modal {
-    background: var(--bg-primary); border-radius: var(--radius-lg);
-    border: 0.5px solid var(--border-md); width: 480px;
-    max-width: calc(100vw - 32px); max-height: 80vh; overflow-y: auto;
-  }
+  #modal { background: var(--bg-primary); border-radius: var(--radius-lg); border: 0.5px solid var(--border-md); width: 480px; max-width: calc(100vw - 32px); max-height: 80vh; overflow-y: auto; }
   .modal-header { padding: 16px 20px; border-bottom: 0.5px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
   .modal-header h3 { font-size: 14px; font-weight: 500; }
   .modal-close { background: none; border: none; cursor: pointer; font-size: 20px; color: var(--text-tertiary); line-height: 1; }
   .modal-body { padding: 20px; }
   .field { margin-bottom: 14px; }
   .field label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 5px; }
-  .field input, .field select, .field textarea {
-    width: 100%; padding: 7px 10px;
-    border: 0.5px solid var(--border-md); border-radius: var(--radius-md);
-    background: var(--bg-secondary); color: var(--text-primary);
-    font-size: 13px; font-family: inherit;
-  }
+  .field input, .field select, .field textarea { width: 100%; padding: 7px 10px; border: 0.5px solid var(--border-md); border-radius: var(--radius-md); background: var(--bg-secondary); color: var(--text-primary); font-size: 13px; font-family: inherit; }
   .field textarea { resize: vertical; min-height: 60px; }
   .modal-footer { padding: 12px 20px; border-top: 0.5px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
-
   select { cursor: pointer; }
 </style>
 </head>
 <body>
 
+<!-- Lock screen -->
+<div id="lock-screen">
+  <div class="lock-card">
+    <h2>Team Planner</h2>
+    <p>Enter your team password to continue</p>
+    <input type="password" id="pw-input" placeholder="Password" onkeydown="if(event.key==='Enter')checkPw()">
+    <div class="lock-error" id="pw-error"></div>
+    <button class="btn btn-primary" style="width:100%;padding:9px;" onclick="checkPw()">Unlock</button>
+  </div>
+</div>
+
 <div id="app">
   <div id="sidebar">
     <div class="sidebar-header">
       <h1>Team Planner</h1>
-      <p>Howwe companion</p>
+      <p><span id="sync-dot"></span><span id="sync-label">Connecting…</span></p>
     </div>
     <div class="nav-section">
       <div class="nav-label">Views</div>
@@ -273,86 +248,64 @@
     <div class="modal-body" id="modal-body"></div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveModal()">Save</button>
+      <button class="btn btn-primary" id="modal-save-btn" onclick="saveModal()">Save</button>
     </div>
   </div>
 </div>
 
+<div id="toast"></div>
+
 <script>
-// ─── Colour palette ───────────────────────────────────────────────────────────
+// ─── Config ───────────────────────────────────────────────────────────────────
+const SUPABASE_URL  = 'https://ougdszmisjtjmvmdgflc.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im91Z2Rzem1pc2p0am12bWRnZmxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MjU1ODksImV4cCI6MjA4OTQwMTU4OX0.sfFRVT53IdHtcDRl01WfKiwEs9hEHxOB2mk4KvhkoEE';
+const TEAM_PASSWORD = 'SbWbud3ttPAULf';
+
+const MEMBERS = [
+  { id: 1, name: 'Anna K.',    initials: 'AK', role: 'Team lead',   colorIdx: 0 },
+  { id: 2, name: 'Björn L.',   initials: 'BL', role: 'Analyst',     colorIdx: 1 },
+  { id: 3, name: 'Cecilia M.', initials: 'CM', role: 'Specialist',  colorIdx: 2 },
+  { id: 4, name: 'David N.',   initials: 'DN', role: 'Coordinator', colorIdx: 3 },
+];
+
 const COLORS = [
-  { bg: '#E6F1FB', text: '#0C447C', dot: '#378ADD' },
-  { bg: '#E1F5EE', text: '#085041', dot: '#1D9E75' },
-  { bg: '#FAEEDA', text: '#633806', dot: '#EF9F27' },
-  { bg: '#FBEAF0', text: '#72243E', dot: '#D4537E' },
+  { bg:'#E6F1FB', text:'#0C447C', dot:'#378ADD' },
+  { bg:'#E1F5EE', text:'#085041', dot:'#1D9E75' },
+  { bg:'#FAEEDA', text:'#633806', dot:'#EF9F27' },
+  { bg:'#FBEAF0', text:'#72243E', dot:'#D4537E' },
 ];
 const DAYS  = ['Mon','Tue','Wed','Thu','Fri'];
-const WEEKS = ['W12 (Mar 18–22)','W13 (Mar 25–29)','W14 (Apr 1–5)'];
-const TODAY_DAY  = 2; // Wednesday (0-indexed)
+const WEEKS = ['W12 (Mar 18–22)','W13 (Mar 25–29)','W14 (Apr 1–5)','W15 (Apr 7–11)','W16 (Apr 14–18)','W17 (Apr 22–25)'];
+const TODAY_DAY  = 2;
 const TODAY_WEEK = 0;
 
-// ─── Persisted state ──────────────────────────────────────────────────────────
-function loadState() {
-  try {
-    const raw = localStorage.getItem('team-planner-state');
-    if (raw) return JSON.parse(raw);
-  } catch(e) {}
-  return null;
+// ─── Password gate ────────────────────────────────────────────────────────────
+function checkPw() {
+  const val = document.getElementById('pw-input').value;
+  if (val === TEAM_PASSWORD) {
+    sessionStorage.setItem('tp-auth', '1');
+    document.getElementById('lock-screen').classList.add('hidden');
+    init();
+  } else {
+    document.getElementById('pw-error').textContent = 'Incorrect password. Try again.';
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-input').focus();
+  }
 }
-function saveState() {
-  try { localStorage.setItem('team-planner-state', JSON.stringify(state)); } catch(e) {}
+
+if (sessionStorage.getItem('tp-auth') === '1') {
+  document.getElementById('lock-screen').classList.add('hidden');
 }
 
-const DEFAULT_STATE = {
-  members: [
-    { id: 1, name: 'Ameli',    initials: 'AQ', role: 'Specialist',   colorIdx: 0 },
-    { id: 2, name: 'Sara',   initials: 'SF', role: 'Retriever',     colorIdx: 1 },
-    { id: 3, name: 'Marcus', initials: 'CM', role: 'Operator',  colorIdx: 2 },
-    { id: 4, name: 'New Person',   initials: 'NP', role: 'Retention Specialist', colorIdx: 3 },
-  ],
-  goals: [
-    {
-      id: 1, title: 'Q2 Customer retention programme', colorIdx: 0,
-      activities: [
-        { id: 11, title: 'Onboarding email sequence', status: 'in-progress', tasks: [
-          { id: 111, title: 'Map current customer journey',   done: true,  assigneeId: 1, week: 0, day: 0 },
-          { id: 112, title: 'Write 5-email sequence draft',   done: false, assigneeId: 1, week: 0, day: 2 },
-          { id: 113, title: 'Review with team',               done: false, assigneeId: 2, week: 0, day: 3 },
-        ]},
-        { id: 12, title: 'NPS survey & analysis', status: 'not-started', tasks: [
-          { id: 121, title: 'Design survey questions', done: false, assigneeId: 3, week: 1, day: 0 },
-          { id: 122, title: 'Set up Typeform',         done: false, assigneeId: 2, week: 1, day: 1 },
-        ]}
-      ]
-    },
-    {
-      id: 2, title: 'Internal process documentation', colorIdx: 1,
-      activities: [
-        { id: 21, title: 'Document team workflows', status: 'in-progress', tasks: [
-          { id: 211, title: 'Interview each team member', done: true,  assigneeId: 4, week: 0, day: 1 },
-          { id: 212, title: 'Draft process maps',         done: false, assigneeId: 4, week: 0, day: 4 },
-          { id: 213, title: 'Upload to shared drive',     done: false, assigneeId: 3, week: 1, day: 0 },
-        ]}
-      ]
-    },
-    {
-      id: 3, title: 'Team capability building', colorIdx: 2,
-      activities: [
-        { id: 31, title: 'Skills gap analysis', status: 'done', tasks: [
-          { id: 311, title: 'Collect self-assessments', done: true, assigneeId: 1, week: 0, day: 0 },
-          { id: 312, title: 'Compile gap report',       done: true, assigneeId: 1, week: 0, day: 1 },
-        ]},
-        { id: 32, title: 'Learning plan per person', status: 'not-started', tasks: [
-          { id: 321, title: 'Book learning sessions', done: false, assigneeId: 2, week: 1, day: 2 },
-        ]}
-      ]
-    }
-  ]
-};
+// ─── Supabase ─────────────────────────────────────────────────────────────────
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-let state = loadState() || JSON.parse(JSON.stringify(DEFAULT_STATE));
+// ─── State ────────────────────────────────────────────────────────────────────
+let goals      = [];
+let activities = [];
+let tasks      = [];
 
-// ─── UI state (not persisted) ─────────────────────────────────────────────────
 let currentView = 'goals';
 let currentWeek = TODAY_WEEK;
 let modalMode   = null;
@@ -361,121 +314,190 @@ let openGoals   = {};
 let openActs    = {};
 let draggedId   = null;
 
-// Pre-open everything on first load
-state.goals.forEach(g => {
-  openGoals[g.id] = true;
-  g.activities.forEach(a => { openActs[a.id] = true; });
-});
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const memberById = id => state.members.find(m => m.id === id);
-const goalById   = id => state.goals.find(g => g.id === id);
-function allTasks() {
-  const out = [];
-  state.goals.forEach(g => g.activities.forEach(a => a.tasks.forEach(t =>
-    out.push({ ...t, activityId: a.id, goalId: g.id })
-  )));
-  return out;
+const memberById = id => MEMBERS.find(m => m.id === id);
+const mc         = idx => COLORS[idx % COLORS.length];
+function esc(s)  { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function filterMid() { const v = document.getElementById('member-filter').value; return v==='all' ? null : parseInt(v); }
+
+function goalProgress(goalId) {
+  const gt = tasks.filter(t => t.goal_id === goalId);
+  return gt.length ? Math.round(gt.filter(t => t.done).length / gt.length * 100) : 0;
 }
-function goalProgress(goal) {
-  const tasks = goal.activities.flatMap(a => a.tasks);
-  return tasks.length ? Math.round(tasks.filter(t => t.done).length / tasks.length * 100) : 0;
-}
-function mc(idx) { return COLORS[idx % COLORS.length]; }
 function statusBadge(s) {
-  if (s === 'done')        return '<span class="badge badge-green">Done</span>';
-  if (s === 'in-progress') return '<span class="badge badge-blue">In progress</span>';
+  if (s==='done')        return '<span class="badge badge-green">Done</span>';
+  if (s==='in-progress') return '<span class="badge badge-blue">In progress</span>';
   return '<span class="badge badge-amber">Not started</span>';
 }
-function filterMid() {
-  const v = document.getElementById('member-filter').value;
-  return v === 'all' ? null : parseInt(v);
+
+// ─── Sync indicator ───────────────────────────────────────────────────────────
+function setSyncState(state, label) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  dot.className = state;
+  lbl.textContent = label;
 }
-function nextId() { return Date.now() + Math.floor(Math.random()*1000); }
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ─── Load data ────────────────────────────────────────────────────────────────
+async function loadAll() {
+  setSyncState('syncing', 'Loading…');
+  document.getElementById('content').innerHTML = '<div class="loading"><div class="spinner"></div>Loading your plan…</div>';
+  try {
+    const [gr, ar, tr] = await Promise.all([
+      db.from('goals').select('*').order('created_at'),
+      db.from('activities').select('*').order('created_at'),
+      db.from('tasks').select('*').order('created_at'),
+    ]);
+    if (gr.error) throw gr.error;
+    goals      = gr.data || [];
+    activities = ar.data || [];
+    tasks      = tr.data || [];
+    goals.forEach(g => { if (openGoals[g.id] === undefined) openGoals[g.id] = true; });
+    activities.forEach(a => { if (openActs[a.id] === undefined) openActs[a.id] = true; });
+    setSyncState('', 'Live');
+    renderAll();
+  } catch(e) {
+    setSyncState('error', 'Error');
+    document.getElementById('content').innerHTML = '<div class="loading">Could not connect to database. Check your internet connection.</div>';
+  }
+}
+
+// ─── Real-time subscriptions ──────────────────────────────────────────────────
+function subscribeRealtime() {
+  db.channel('schema-db-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'goals' }, () => loadAll())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, () => loadAll())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => loadAll())
+    .subscribe(status => {
+      if (status === 'SUBSCRIBED') setSyncState('', 'Live');
+      if (status === 'CLOSED' || status === 'CHANNEL_ERROR') setSyncState('error', 'Reconnecting…');
+    });
+}
+
+// ─── CRUD ─────────────────────────────────────────────────────────────────────
+async function addGoal(title, colorIdx) {
+  setSyncState('syncing', 'Saving…');
+  const { error } = await db.from('goals').insert({ title, color_idx: colorIdx });
+  if (error) { showToast('Error saving goal'); setSyncState('error','Error'); }
+}
+async function deleteGoal(id) {
+  if (!confirm('Delete this goal and all its activities and tasks?')) return;
+  setSyncState('syncing', 'Deleting…');
+  await db.from('goals').delete().eq('id', id);
+}
+async function addActivity(goalId, title, status) {
+  setSyncState('syncing', 'Saving…');
+  const { error } = await db.from('activities').insert({ goal_id: goalId, title, status });
+  if (error) { showToast('Error saving activity'); setSyncState('error','Error'); }
+}
+async function deleteActivity(id) {
+  if (!confirm('Delete this activity and all its tasks?')) return;
+  setSyncState('syncing', 'Deleting…');
+  await db.from('activities').delete().eq('id', id);
+}
+async function addTask(goalId, activityId, title, assigneeId, weekIdx, dayIdx) {
+  setSyncState('syncing', 'Saving…');
+  const { error } = await db.from('tasks').insert({ goal_id: goalId, activity_id: activityId, title, assignee_id: assigneeId, week_idx: weekIdx, day_idx: dayIdx, done: false });
+  if (error) { showToast('Error saving task'); setSyncState('error','Error'); }
+}
+async function toggleTask(id, current) {
+  setSyncState('syncing', 'Saving…');
+  await db.from('tasks').update({ done: !current }).eq('id', id);
+}
+async function moveTask(id, weekIdx, dayIdx) {
+  setSyncState('syncing', 'Saving…');
+  await db.from('tasks').update({ week_idx: weekIdx, day_idx: dayIdx }).eq('id', id);
+}
+async function deleteTask(id) {
+  setSyncState('syncing', 'Deleting…');
+  await db.from('tasks').delete().eq('id', id);
+}
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 function renderSidebar() {
   document.getElementById('sidebar-weeks').innerHTML = WEEKS.map((w,i) =>
     `<button class="nav-btn ${currentWeek===i?'active':''}" style="font-size:11px;" onclick="setWeek(${i})">${w}</button>`
   ).join('');
-
-  document.getElementById('sidebar-members').innerHTML = state.members.map(m => {
+  document.getElementById('sidebar-members').innerHTML = MEMBERS.map(m => {
     const c = mc(m.colorIdx);
     return `<button class="nav-btn" style="font-size:12px;" onclick="filterMember(${m.id})">
       <span class="dot" style="background:${c.dot}"></span>${m.name}
     </button>`;
   }).join('');
-
   const sel = document.getElementById('member-filter');
   const cur = sel.value;
   sel.innerHTML = '<option value="all">All members</option>' +
-    state.members.map(m => `<option value="${m.id}" ${cur==m.id?'selected':''}>${m.name}</option>`).join('');
+    MEMBERS.map(m => `<option value="${m.id}" ${cur==m.id?'selected':''}>${m.name}</option>`).join('');
 }
-
-function setWeek(i) { currentWeek = i; showView('week'); }
-function filterMember(id) { document.getElementById('member-filter').value = id; showView('goals'); }
+function setWeek(i) { currentWeek=i; showView('week'); }
+function filterMember(id) { document.getElementById('member-filter').value=id; showView('goals'); }
 
 // ─── View switching ───────────────────────────────────────────────────────────
 function showView(v) {
   currentView = v;
-  ['goals','week','team'].forEach(n =>
-    document.getElementById('nav-'+n).classList.toggle('active', n===v)
-  );
+  ['goals','week','team'].forEach(n => document.getElementById('nav-'+n).classList.toggle('active', n===v));
   const titles = { goals:'Goals &amp; Activities', week: WEEKS[currentWeek], team:'Team board' };
   document.getElementById('view-title').innerHTML = titles[v];
   const btn = document.getElementById('add-btn');
-  if (v === 'goals') { btn.style.display=''; btn.textContent='+ Add goal';  btn.onclick=()=>openModal('goal'); }
-  else if (v === 'week') { btn.style.display=''; btn.textContent='+ Add task'; btn.onclick=()=>openModal('task',{week:currentWeek,day:0}); }
-  else { btn.style.display='none'; }
+  if (v==='goals')     { btn.style.display=''; btn.textContent='+ Add goal'; btn.onclick=()=>openModal('goal'); }
+  else if (v==='week') { btn.style.display=''; btn.textContent='+ Add task'; btn.onclick=()=>openModal('task',{weekIdx:currentWeek,dayIdx:0}); }
+  else                 { btn.style.display='none'; }
   renderAll();
 }
-
-function renderAll() {
-  renderSidebar();
-  if (currentView==='goals')  renderGoals();
-  else if (currentView==='week') renderWeek();
-  else renderTeam();
-}
+function renderAll() { renderSidebar(); if(currentView==='goals') renderGoals(); else if(currentView==='week') renderWeek(); else renderTeam(); }
 
 // ─── Goals view ───────────────────────────────────────────────────────────────
 function renderGoals() {
   const fid = filterMid();
   let html = '';
-  state.goals.forEach(g => {
-    const prog = goalProgress(g);
-    const c = mc(g.colorIdx);
+  if (!goals.length) {
+    html = `<div class="loading" style="padding:40px 20px;">No goals yet — click <strong>+ Add goal</strong> to get started.</div>`;
+  }
+  goals.forEach(g => {
+    const prog = goalProgress(g.id);
+    const c    = mc(g.color_idx);
+    const acts = activities.filter(a => a.goal_id === g.id);
     html += `<div class="goal-card">
-      <div class="goal-header" onclick="toggleGoal(${g.id})">
+      <div class="goal-header" onclick="toggleGoal('${g.id}')">
         <div style="width:4px;height:36px;border-radius:2px;background:${c.dot};flex-shrink:0;"></div>
         <div style="flex:1;min-width:0;">
           <div class="goal-title">${esc(g.title)}</div>
-          <div class="goal-meta">${g.activities.length} activities · ${prog}% complete</div>
+          <div class="goal-meta">${acts.length} activities · ${prog}% complete</div>
         </div>
-        <button class="btn" style="font-size:11px;margin-right:4px;" onclick="event.stopPropagation();openModal('activity',{goalId:${g.id}})">+ Activity</button>
+        <button class="btn" style="font-size:11px;margin-right:4px;" onclick="event.stopPropagation();openModal('activity',{goalId:'${g.id}'})">+ Activity</button>
+        <button class="delete-btn" title="Delete goal" onclick="event.stopPropagation();deleteGoal('${g.id}')">×</button>
         <span class="chev ${openGoals[g.id]?'open':''}">▶</span>
       </div>
       <div class="progress-bar"><div class="progress-fill" style="width:${prog}%;background:${c.dot};"></div></div>
       <div class="goal-body ${openGoals[g.id]?'':'collapsed'}">`;
 
-    g.activities.forEach(a => {
-      const visible = fid ? a.tasks.filter(t => t.assigneeId===fid) : a.tasks;
+    acts.forEach(a => {
+      const at = tasks.filter(t => t.activity_id === a.id);
+      const visible = fid ? at.filter(t => t.assignee_id === fid) : at;
       if (fid && !visible.length) return;
       html += `<div class="activity-row">
-        <div class="activity-header" onclick="toggleAct(${a.id})">
+        <div class="activity-header" onclick="toggleAct('${a.id}')">
           <span class="chev ${openActs[a.id]?'open':''}" style="font-size:9px;">▶</span>
           <span class="activity-name">${esc(a.title)}</span>
           ${statusBadge(a.status)}
-          <button class="btn" style="font-size:10px;padding:3px 8px;" onclick="event.stopPropagation();openModal('task',{goalId:${g.id},activityId:${a.id},week:${currentWeek}})">+ Task</button>
+          <button class="btn" style="font-size:10px;padding:3px 8px;" onclick="event.stopPropagation();openModal('task',{goalId:'${g.id}',activityId:'${a.id}',weekIdx:${currentWeek}})">+ Task</button>
+          <button class="delete-btn" title="Delete activity" onclick="event.stopPropagation();deleteActivity('${a.id}')">×</button>
         </div>
         <div class="task-list ${openActs[a.id]?'':'collapsed'}">`;
       visible.forEach(t => {
-        const m  = memberById(t.assigneeId);
+        const m  = memberById(t.assignee_id);
         const tc = m ? mc(m.colorIdx) : COLORS[0];
-        html += `<div class="task-row" draggable="true" ondragstart="onDragStart(event,${t.id})">
-          <div class="task-check ${t.done?'done':''}" onclick="toggleTask(${t.id})"></div>
+        html += `<div class="task-row" draggable="true" ondragstart="onDragStart(event,'${t.id}')">
+          <div class="task-check ${t.done?'done':''}" onclick="toggleTask('${t.id}',${t.done})"></div>
           <span class="task-label ${t.done?'done':''}">${esc(t.title)}</span>
-          ${m ? `<span style="font-size:10px;background:${tc.bg};color:${tc.text};padding:1px 6px;border-radius:10px;">${m.initials}</span>` : ''}
-          <span class="task-week">${WEEKS[t.week].split(' ')[0]} ${DAYS[t.day]}</span>
+          ${m?`<span style="font-size:10px;background:${tc.bg};color:${tc.text};padding:1px 6px;border-radius:10px;">${m.initials}</span>`:''}
+          <span class="task-week">${WEEKS[t.week_idx]?WEEKS[t.week_idx].split(' ')[0]:'?'} ${DAYS[t.day_idx]||''}</span>
+          <button class="delete-btn" title="Delete task" onclick="event.stopPropagation();deleteTask('${t.id}')">×</button>
         </div>`;
       });
       html += `</div></div>`;
@@ -484,25 +506,17 @@ function renderGoals() {
   });
   document.getElementById('content').innerHTML = html;
 }
-
 function toggleGoal(id) { openGoals[id]=!openGoals[id]; renderAll(); }
 function toggleAct(id)  { openActs[id]=!openActs[id];   renderAll(); }
-function toggleTask(id) {
-  state.goals.forEach(g => g.activities.forEach(a => {
-    const t = a.tasks.find(t => t.id===id);
-    if (t) t.done = !t.done;
-  }));
-  saveState(); renderAll();
-}
 
 // ─── Week view ────────────────────────────────────────────────────────────────
 function renderWeek() {
   const fid = filterMid();
-  const tasks = allTasks().filter(t => t.week===currentWeek && (!fid || t.assigneeId===fid));
-  let html = `<div class="week-grid">`;
-  DAYS.forEach((day, di) => {
-    const dayTasks = tasks.filter(t => t.day===di);
-    const isToday  = currentWeek===TODAY_WEEK && di===TODAY_DAY;
+  const wt  = tasks.filter(t => t.week_idx===currentWeek && (!fid||t.assignee_id===fid));
+  let html  = `<div class="week-grid">`;
+  DAYS.forEach((day,di) => {
+    const dt      = wt.filter(t => t.day_idx===di);
+    const isToday = currentWeek===TODAY_WEEK && di===TODAY_DAY;
     html += `<div class="day-col" id="day-${di}"
       ondragover="event.preventDefault();this.classList.add('drag-over')"
       ondragleave="this.classList.remove('drag-over')"
@@ -511,45 +525,38 @@ function renderWeek() {
         <div class="day-name">${day}</div>
         <div class="day-date ${isToday?'today':''}">${18+di}</div>
       </div>
-      <div class="day-tasks">
-        <div class="drop-hint">Drop task here</div>`;
-    dayTasks.forEach(t => {
-      const g  = goalById(t.goalId);
-      const gc = g ? mc(g.colorIdx) : COLORS[0];
-      const m  = memberById(t.assigneeId);
-      html += `<div class="day-task" style="background:${gc.bg};" draggable="true" ondragstart="onDragStart(event,${t.id})">
+      <div class="day-tasks"><div class="drop-hint">Drop here</div>`;
+    dt.forEach(t => {
+      const g  = goals.find(g => g.id===t.goal_id);
+      const gc = g ? mc(g.color_idx) : COLORS[0];
+      const m  = memberById(t.assignee_id);
+      html += `<div class="day-task" style="background:${gc.bg};" draggable="true" ondragstart="onDragStart(event,'${t.id}')">
         <div class="day-task-title" style="color:${gc.text};">${esc(t.title)}</div>
-        <div class="day-task-sub"   style="color:${gc.text};">${g ? esc(g.title).substring(0,28)+'…' : ''}${m?' · '+m.initials:''}</div>
+        <div class="day-task-sub"   style="color:${gc.text};">${g?esc(g.title).substring(0,26)+'…':''}${m?' · '+m.initials:''}</div>
       </div>`;
     });
-    html += `<button class="add-task-day" onclick="openModal('task',{week:${currentWeek},day:${di}})">+ Add task</button>
+    html += `<button class="add-task-day" onclick="openModal('task',{weekIdx:${currentWeek},dayIdx:${di}})">+ Add task</button>
       </div></div>`;
   });
   html += `</div>`;
   document.getElementById('content').innerHTML = html;
 }
-
-function onDragStart(e, id) { draggedId = id; e.dataTransfer.effectAllowed='move'; }
+function onDragStart(e, id) { draggedId=id; e.dataTransfer.effectAllowed='move'; }
 function onDrop(e, dayIdx) {
   e.preventDefault();
   document.querySelectorAll('.day-col').forEach(d => d.classList.remove('drag-over'));
-  if (draggedId === null) return;
-  state.goals.forEach(g => g.activities.forEach(a => {
-    const t = a.tasks.find(t => t.id===draggedId);
-    if (t) { t.day=dayIdx; t.week=currentWeek; }
-  }));
+  if (!draggedId) return;
+  moveTask(draggedId, currentWeek, dayIdx);
   draggedId = null;
-  saveState(); renderAll();
 }
 
 // ─── Team view ────────────────────────────────────────────────────────────────
 function renderTeam() {
-  const tasks = allTasks();
   let html = `<div class="team-grid">`;
-  state.members.forEach(m => {
-    const mt = tasks.filter(t => t.assigneeId===m.id);
+  MEMBERS.forEach(m => {
+    const mt   = tasks.filter(t => t.assignee_id===m.id);
     const done = mt.filter(t => t.done).length;
-    const wt   = mt.filter(t => t.week===currentWeek);
+    const wt   = mt.filter(t => t.week_idx===currentWeek);
     const c    = mc(m.colorIdx);
     html += `<div class="member-card">
       <div class="member-header">
@@ -557,26 +564,23 @@ function renderTeam() {
         <div><div class="member-name">${m.name}</div><div class="member-role">${m.role}</div></div>
       </div>
       <div class="member-stats">
-        <div class="stat"><div class="stat-val">${mt.length}</div><div class="stat-label">Total tasks</div></div>
+        <div class="stat"><div class="stat-val">${mt.length}</div><div class="stat-label">Total</div></div>
         <div class="stat"><div class="stat-val" style="color:#3b6d11;">${done}</div><div class="stat-label">Done</div></div>
         <div class="stat"><div class="stat-val" style="color:#185fa5;">${wt.length}</div><div class="stat-label">This week</div></div>
         <div class="stat"><div class="stat-val">${mt.length?Math.round(done/mt.length*100):0}%</div><div class="stat-label">Progress</div></div>
       </div>
       <div class="member-tasks">`;
     const pending = mt.filter(t => !t.done).slice(0,4);
-    if (!pending.length) {
-      html += `<p style="font-size:11px;color:var(--text-tertiary);padding:4px 0;">All tasks complete ✓</p>`;
-    }
+    if (!pending.length) html += `<p style="font-size:11px;color:var(--text-tertiary);padding:4px 0;">All tasks complete ✓</p>`;
     pending.forEach(t => {
-      const g = goalById(t.goalId);
-      const gc = g ? mc(g.colorIdx) : COLORS[0];
+      const g  = goals.find(g => g.id===t.goal_id);
+      const gc = g ? mc(g.color_idx) : COLORS[0];
       html += `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:0.5px solid var(--border);">
         <div style="width:3px;height:28px;border-radius:2px;background:${gc.dot};flex-shrink:0;"></div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.title)}</div>
-          <div style="font-size:10px;color:var(--text-tertiary);">${WEEKS[t.week].split(' ')[0]} ${DAYS[t.day]}</div>
-        </div>
-      </div>`;
+          <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.title)}</div>
+          <div style="font-size:10px;color:var(--text-tertiary);">${WEEKS[t.week_idx]?WEEKS[t.week_idx].split(' ')[0]:'?'} ${DAYS[t.day_idx]||''}</div>
+        </div></div>`;
     });
     html += `</div></div>`;
   });
@@ -586,15 +590,14 @@ function renderTeam() {
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 function openModal(mode, ctx={}) {
-  modalMode = mode; modalCtx = ctx;
-  document.getElementById('modal-title').textContent =
-    { goal:'Add goal', activity:'Add activity', task:'Add task' }[mode];
+  modalMode=mode; modalCtx=ctx;
+  document.getElementById('modal-title').textContent = {goal:'Add goal',activity:'Add activity',task:'Add task'}[mode];
   let body = '';
-  if (mode === 'goal') {
+  if (mode==='goal') {
     body = `<div class="field"><label>Goal title</label><input id="f-title" placeholder="e.g. Improve customer satisfaction"></div>
     <div class="field"><label>Colour</label><select id="f-color">${COLORS.map((_,i)=>`<option value="${i}">Colour ${i+1}</option>`).join('')}</select></div>`;
-  } else if (mode === 'activity') {
-    const g = goalById(ctx.goalId);
+  } else if (mode==='activity') {
+    const g = goals.find(g => g.id===ctx.goalId);
     body = `<div class="field"><label>Goal</label><input value="${g?esc(g.title):''}" disabled style="opacity:.6;"></div>
     <div class="field"><label>Activity title</label><input id="f-title" placeholder="e.g. Customer interviews"></div>
     <div class="field"><label>Status</label><select id="f-status">
@@ -603,81 +606,63 @@ function openModal(mode, ctx={}) {
       <option value="done">Done</option>
     </select></div>`;
   } else {
-    const goalOpts = state.goals.map(g => `<option value="${g.id}">${esc(g.title)}</option>`).join('');
-    const firstGoal = ctx.goalId ? goalById(ctx.goalId) : state.goals[0];
-    const actOpts = firstGoal ? firstGoal.activities.map(a => `<option value="${a.id}">${esc(a.title)}</option>`).join('') : '';
+    const goalOpts = goals.map(g=>`<option value="${g.id}">${esc(g.title)}</option>`).join('');
+    const firstGoal = ctx.goalId ? goals.find(g=>g.id===ctx.goalId) : goals[0];
+    const actOpts = firstGoal ? activities.filter(a=>a.goal_id===firstGoal.id).map(a=>`<option value="${a.id}">${esc(a.title)}</option>`).join('') : '';
     body = `<div class="field"><label>Task title</label><input id="f-title" placeholder="e.g. Write first draft"></div>
     <div class="field"><label>Goal</label><select id="f-goal" onchange="updateActList()">${goalOpts}</select></div>
     <div class="field"><label>Activity</label><select id="f-activity">${actOpts}</select></div>
-    <div class="field"><label>Assigned to</label><select id="f-member">${state.members.map(m=>`<option value="${m.id}">${m.name}</option>`).join('')}</select></div>
+    <div class="field"><label>Assigned to</label><select id="f-member">${MEMBERS.map(m=>`<option value="${m.id}">${m.name}</option>`).join('')}</select></div>
     <div class="field" style="display:flex;gap:10px;">
-      <div style="flex:1;"><label>Week</label><select id="f-week">${WEEKS.map((w,i)=>`<option value="${i}" ${ctx.week===i?'selected':''}>${w}</option>`).join('')}</select></div>
-      <div style="flex:1;"><label>Day</label><select id="f-day">${DAYS.map((d,i)=>`<option value="${i}" ${ctx.day===i?'selected':''}>${d}</option>`).join('')}</select></div>
+      <div style="flex:1;"><label>Week</label><select id="f-week">${WEEKS.map((w,i)=>`<option value="${i}" ${ctx.weekIdx===i?'selected':''}>${w}</option>`).join('')}</select></div>
+      <div style="flex:1;"><label>Day</label><select id="f-day">${DAYS.map((d,i)=>`<option value="${i}" ${ctx.dayIdx===i?'selected':''}>${d}</option>`).join('')}</select></div>
     </div>`;
   }
   document.getElementById('modal-body').innerHTML = body;
   if (mode==='task') {
-    if (ctx.goalId) document.getElementById('f-goal').value = ctx.goalId;
+    if (ctx.goalId)     document.getElementById('f-goal').value = ctx.goalId;
     if (ctx.activityId) document.getElementById('f-activity').value = ctx.activityId;
   }
   document.getElementById('modal-overlay').classList.add('open');
-  setTimeout(() => document.getElementById('f-title')?.focus(), 50);
+  setTimeout(()=>document.getElementById('f-title')?.focus(), 50);
 }
-
 function updateActList() {
-  const gid = parseInt(document.getElementById('f-goal').value);
-  const g = goalById(gid);
-  document.getElementById('f-activity').innerHTML = g
-    ? g.activities.map(a => `<option value="${a.id}">${esc(a.title)}</option>`).join('')
-    : '';
+  const gid = document.getElementById('f-goal').value;
+  document.getElementById('f-activity').innerHTML =
+    activities.filter(a=>a.goal_id===gid).map(a=>`<option value="${a.id}">${esc(a.title)}</option>`).join('');
 }
-
 function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
-
-function saveModal() {
+async function saveModal() {
   const title = document.getElementById('f-title')?.value?.trim();
   if (!title) return;
-  if (modalMode === 'goal') {
-    const colorIdx = parseInt(document.getElementById('f-color').value);
-    state.goals.push({ id: nextId(), title, colorIdx, activities: [] });
-  } else if (modalMode === 'activity') {
-    const g = goalById(modalCtx.goalId);
-    if (g) {
-      const status = document.getElementById('f-status').value;
-      g.activities.push({ id: nextId(), title, status, tasks: [] });
-      openGoals[g.id] = true;
-    }
+  const btn = document.getElementById('modal-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  if (modalMode==='goal') {
+    await addGoal(title, parseInt(document.getElementById('f-color').value));
+  } else if (modalMode==='activity') {
+    await addActivity(modalCtx.goalId, title, document.getElementById('f-status').value);
+    openGoals[modalCtx.goalId] = true;
   } else {
-    const gid = parseInt(document.getElementById('f-goal').value);
-    const aid = parseInt(document.getElementById('f-activity').value);
-    const g = goalById(gid);
-    const a = g?.activities.find(a => a.id===aid);
-    if (a) {
-      a.tasks.push({
-        id: nextId(), title, done: false,
-        assigneeId: parseInt(document.getElementById('f-member').value),
-        week: parseInt(document.getElementById('f-week').value),
-        day:  parseInt(document.getElementById('f-day').value),
-      });
-      openGoals[gid] = true; openActs[aid] = true;
-    }
+    const gid = document.getElementById('f-goal').value;
+    const aid = document.getElementById('f-activity').value;
+    await addTask(gid, aid, title, parseInt(document.getElementById('f-member').value), parseInt(document.getElementById('f-week').value), parseInt(document.getElementById('f-day').value));
+    openGoals[gid]=true; openActs[aid]=true;
   }
-  closeModal(); saveState(); renderAll();
+  btn.disabled=false; btn.textContent='Save';
+  closeModal();
 }
-
-// Keyboard shortcut: Enter to save modal
 document.getElementById('modal').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') { e.preventDefault(); saveModal(); }
-  if (e.key === 'Escape') closeModal();
+  if (e.key==='Enter' && e.target.tagName!=='TEXTAREA') { e.preventDefault(); saveModal(); }
+  if (e.key==='Escape') closeModal();
 });
 
-// ─── Utility ──────────────────────────────────────────────────────────────────
-function esc(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+async function init() {
+  await loadAll();
+  subscribeRealtime();
 }
 
-// ─── Boot ─────────────────────────────────────────────────────────────────────
-renderAll();
+if (sessionStorage.getItem('tp-auth') === '1') init();
 </script>
 </body>
 </html>
